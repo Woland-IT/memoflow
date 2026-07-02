@@ -1,7 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'core/theme.dart';
+import 'package:provider/provider.dart';
+import 'core/services/auth_service.dart';
 
 // Nowe importy
+
 import 'features/auth/screens/login_screen.dart';
 import 'features/notes/screens/notes_screen.dart';
 import 'features/tasks/screens/tasks_screen.dart';
@@ -27,6 +30,23 @@ class _MemoFlowAppState extends State<MemoFlowApp> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Nasłuchiwanie zmian autoryzacji
+    final authService = Provider.of<AuthService>(context, listen: false);
+    authService.authStateChanges.listen((event) {
+      if (mounted) {
+        final isLoggedIn = event.session != null;
+        if (isLoggedIn) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        } else {
+          Navigator.of(context).pushReplacementNamed('/login');
+        }
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MemoFlow',
@@ -36,7 +56,7 @@ class _MemoFlowAppState extends State<MemoFlowApp> {
       debugShowCheckedModeBanner: false,
       
       // Routing
-      initialRoute: '/login',                    // Start od logowania (możesz zmienić na '/home')
+      initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => _buildMainScaffold(),
@@ -44,7 +64,7 @@ class _MemoFlowAppState extends State<MemoFlowApp> {
     );
   }
 
-  // Główny ekran z bottom nav (wyodrębniony, żeby nie duplikować kodu)
+  // Główny ekran z bottom nav
   Widget _buildMainScaffold() {
     return Scaffold(
       appBar: AppBar(

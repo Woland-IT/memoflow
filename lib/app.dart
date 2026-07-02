@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/theme.dart';
-import 'package:provider/provider.dart';
-import 'core/services/auth_service.dart';
 
-
-// Nowe importy
-
+// Ekrany
 import 'features/auth/screens/login_screen.dart';
 import 'features/notes/screens/notes_screen.dart';
 import 'features/tasks/screens/tasks_screen.dart';
@@ -24,28 +20,11 @@ class _MemoFlowAppState extends State<MemoFlowApp> {
   int _currentIndex = 0;
   bool _isDarkMode = false;
 
-  final List<Widget> _screens = const [
-    NotesScreen(),
-    TasksScreen(),
-    ShoppingScreen(),
+  final List<Widget> _screens = [
+    const NotesScreen(),
+    const TasksScreen(),
+    const ShoppingScreen(),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Nasłuchiwanie zmian autoryzacji
-    final authService = Provider.of<AuthService>(context, listen: false);
-    authService.authStateChanges.listen((event) {
-      if (mounted) {
-        final isLoggedIn = event.session != null;
-        if (isLoggedIn) {
-          Navigator.of(context).pushReplacementNamed('/home');
-        } else {
-          Navigator.of(context).pushReplacementNamed('/login');
-        }
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,18 +34,17 @@ class _MemoFlowAppState extends State<MemoFlowApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
       debugShowCheckedModeBanner: false,
-      
-      // Routing
+
       initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginScreen(),
-        '/home': (context) => _buildMainScaffold(),
+        '/home': (context) => _buildMainScaffold(context),
       },
+      builder: (context, child) => child ?? const SizedBox(),
     );
   }
 
-  // Główny ekran z bottom nav
-  Widget _buildMainScaffold() {
+  Widget _buildMainScaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('MemoFlow'),
@@ -74,7 +52,6 @@ class _MemoFlowAppState extends State<MemoFlowApp> {
           IconButton(
             icon: Icon(_isDarkMode ? Icons.light_mode : Icons.dark_mode),
             onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
-            tooltip: 'Zmień motyw',
           ),
         ],
       ),

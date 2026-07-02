@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'app.dart';
 
@@ -17,15 +18,17 @@ import 'core/services/auth_service.dart';
 import 'core/services/sync_service.dart';
 import 'core/notifications.dart';
 
-// Usunięto flutter_dotenv – użyj --dart-define w produkcji
-
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Inicjalizacja Supabase – w produkcji użyj dart-define
+
+  // Wczytaj plik .env
+  await dotenv.load(fileName: ".env");
+
+  // ====================== SUPABASE ======================
   await Supabase.initialize(
-    url: const String.fromEnvironment('SUPABASE_URL', defaultValue: 'YOUR_URL'),
-    anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: 'YOUR_KEY'),
+    url: dotenv.env['SUPABASE_URL'] ?? 'https://twoj-projekt.supabase.co',
+    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+    debug: true,
   );
 
   // ====================== HIVE ======================
@@ -39,16 +42,17 @@ void main() async {
   await Hive.openBox<Task>('tasks');
   await Hive.openBox<ShoppingItem>('shopping_items');
 
-  // Inicjalizacja powiadomień
-  await NotificationService.init();
+  // ====================== NOTIFICATIONS ======================
+  // await NotificationService.init();
 
+  // ====================== PROVIDERS ======================
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => NotesProvider()),
         ChangeNotifierProvider(create: (_) => TasksProvider()),
         ChangeNotifierProvider(create: (_) => ShoppingProvider()),
-        ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => SyncService()),
       ],
       child: const MemoFlowApp(),

@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 import '../models/task_model.dart';
 import '../models/task_type.dart';
 
 class TasksProvider with ChangeNotifier {
   final Box<Task> _box = Hive.box<Task>('tasks');
-
-  bool _isLoading = false;
-  String? _errorMessage;
-
-  bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
+  final supabase = Supabase.instance.client;
+  final _uuid = const Uuid();
 
   List<Task> get tasks {
     final list = _box.values.toList();
@@ -22,84 +20,89 @@ class TasksProvider with ChangeNotifier {
       !t.isDone && t.dateTime.isAfter(DateTime.now().subtract(const Duration(days: 1)))).toList();
 
   Future<void> addTask(
-  String title, 
-  DateTime dateTime, 
-  TaskType type, 
-  {String? description, String recurrence = "none"}
- ) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+    String title, 
+    DateTime dateTime, 
+    TaskType type, 
+    {String? description, String recurrence = "none"}
+  ) async {
+    final task = Task(
+      id: _uuid.v4(),
+      title: title.trim(),
+      description: description,
+      dateTime: dateTime,
+      type: type.name,
+      isDone: false,
+      recurrence: recurrence,
+    );
 
-    try {
-      if (title.trim().isEmpty) throw Exception('Tytuł zadania nie może być pusty');
-      final task = Task(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        title: title.trim(),
-        description: description,
-        dateTime: dateTime,
-        type: type.name,
-        recurrence: recurrence,
-      );
-      await _box.put(task.id, task);
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    await _box.put(task.id, task);
+    notifyListeners();
+    await _syncToSupabase(task);
   }
 
   Future<void> toggleDone(String id) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+    final task = _box.get(id);
+    if (task == null) return;
 
-    try {
-      final task = _box.get(id);
-      if (task != null) {
-        task.isDone = !task.isDone;
-        task.updatedAt = DateTime.now();
-        await task.save();
-      }
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    task.isDone = !task.isDone;
+    // task.updatedAt = DateTime.now(); // jeśli nie ma pola, zakomentuj
+    await task.save();
+    notifyListeners();
+    await _syncToSupabase(task);
   }
 
   Future<void> deleteTask(String id) async {
-    _isLoading = true;
-    _errorMessage = null;
+    await _box.delete(id);
     notifyListeners();
 
     try {
-      await _box.delete(id);
+      await supabase.from('tasks').delete().eq('id', id);
     } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      print('Błąd usuwania z Supabase: $e');
     }
   }
 
-  // Generowanie powtarzających się zadań (zostawione z poprawkami)
-  Future<void> generateRecurringInstances() async {
-    _isLoading = true;
-    notifyListeners();
-    // ... istniejąca logika ...
-    _isLoading = false;
-    notifyListeners();
+  Future<void> _syncToSupabase(Task task) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await supabase.from('tasks').upsert({
+        'id': task.id,
+        'user_id': user.id,
+        'title': task.title,
+        'description': task.description,
+        'is_completed': task.isDone,
+        'due_date': task.dateTime.toIso8601String(),
+        'recurring': task.recurrence,
+        'created_at': DateTime.now().toIso8601String(),   // używamy bieżącej daty
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'id');
+
+      print('✅ Zadanie zsynchronizowane');
+    } catch (e) {
+      print('❌ Błąd sync zadania: $e');
+    }
   }
 
-  void clearError() {
-    _errorMessage = null;
-    notifyListeners();
-  }
+  Future<void> loadFromSupabase() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
 
-  bool isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
+    try {
+      final response = await supabase
+          .from('tasks')
+          .select()
+          .eq('user_id', user.id);
+
+      for (var json in response) {
+        final task = Task.fromJson(json);
+        await _box.put(task.id, task);
+      }
+      notifyListeners();
+      print('✅ Pobrano zadania z Supabase');
+    } catch (e) {
+      print('❌ Błąd pobierania zadań: $e');
+    }
   }
 }

@@ -56,28 +56,31 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleAuthResult(String? error) async {
-    if (error == null && mounted) {
-      final notesP = Provider.of<NotesProvider>(context, listen: false);
-      final tasksP = Provider.of<TasksProvider>(context, listen: false);
-      final shoppingP = Provider.of<ShoppingProvider>(context, listen: false);
-      final syncService = Provider.of<SyncService>(context, listen: false);
+  if (error == null && mounted) {
+    final notesP = Provider.of<NotesProvider>(context, listen: false);
+    final tasksP = Provider.of<TasksProvider>(context, listen: false);
+    final shoppingP = Provider.of<ShoppingProvider>(context, listen: false);
 
-      await syncService.syncAll(
-        notesProvider: notesP,
-        tasksProvider: tasksP,
-        shoppingProvider: shoppingP,
+    // Wczytaj dane z Supabase po zalogowaniu
+    await Future.wait([
+      notesP.loadFromSupabase(),
+      tasksP.loadFromSupabase(),
+      shoppingP.loadFromSupabase(),
+    ]);
+
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/home');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Zalogowano i zsynchronizowano dane')),
       );
-
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
-    } else {
-      setState(() {
-        _errorMessage = error ?? 'Błąd';
-        _isLoading = false;
-      });
     }
+  } else {
+    setState(() {
+      _errorMessage = error ?? 'Błąd logowania';
+      _isLoading = false;
+    });
   }
+}
 
   @override
   Widget build(BuildContext context) {

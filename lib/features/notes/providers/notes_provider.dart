@@ -45,10 +45,6 @@ class NotesProvider with ChangeNotifier {
     }
   }
 
-  // update i delete analogicznie używają _repository
-  Future<void> updateNote(String id, String title, String content, {String? category}) async { /* ... */ }
-  Future<void> deleteNote(String id) async { /* ... */ }
-
   void clearError() {
     _errorMessage = null;
     notifyListeners();

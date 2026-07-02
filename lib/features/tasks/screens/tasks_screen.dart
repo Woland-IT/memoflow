@@ -1,3 +1,7 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/tasks_provider.dart';
+
 // Podobnie jak NotesScreen - dodano isLoading
 // ... (skrócone dla przykładu)
 class TasksScreen extends StatelessWidget {

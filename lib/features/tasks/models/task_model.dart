@@ -1,33 +1,32 @@
 import 'package:hive/hive.dart';
-import 'task_type.dart';
 
 part 'task_model.g.dart';
 
 @HiveType(typeId: 1)
 class Task extends HiveObject {
   @HiveField(0)
-  String id;
+  final String id;
 
   @HiveField(1)
-  String title;
+  final String title;
 
   @HiveField(2)
-  String? description;
+  final String? description;
 
   @HiveField(3)
-  DateTime dateTime;
+  final DateTime dateTime;
 
   @HiveField(4)
-  String type;  // birthday, meeting itd.
+  final String type;
 
   @HiveField(5)
-  bool isDone;
+  final String recurrence;
 
   @HiveField(6)
-  DateTime? updatedAt;
+  bool isDone;
 
   @HiveField(7)
-  String recurrence;   // "none", "weekly" itd.
+  DateTime? updatedAt;
 
   Task({
     required this.id,
@@ -35,10 +34,31 @@ class Task extends HiveObject {
     this.description,
     required this.dateTime,
     required this.type,
+    this.recurrence = 'none',
     this.isDone = false,
     this.updatedAt,
-    this.recurrence = "none",
-  }) {
-    updatedAt ??= DateTime.now();
-  }
+  });
+
+  factory Task.fromJson(Map<String, dynamic> json) => Task(
+        id: json['id'],
+        title: json['title'],
+        description: json['description'],
+        dateTime: DateTime.parse(json['date_time']),
+        type: json['type'],
+        recurrence: json['recurrence'] ?? 'none',
+        isDone: json['is_done'] ?? false,
+        updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+      );
+
+  Map<String, dynamic> toJson(String userId) => {
+        'id': id,
+        'user_id': userId,
+        'title': title,
+        'description': description,
+        'date_time': dateTime.toIso8601String(),
+        'type': type,
+        'recurrence': recurrence,
+        'is_done': isDone,
+        'updated_at': (updatedAt ?? DateTime.now()).toIso8601String(),
+      };
 }

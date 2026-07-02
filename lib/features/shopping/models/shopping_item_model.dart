@@ -5,29 +5,54 @@ part 'shopping_item_model.g.dart';
 @HiveType(typeId: 2)
 class ShoppingItem extends HiveObject {
   @HiveField(0)
-  String id;
+  final String id;
 
   @HiveField(1)
-  String name;
+  final String name;
 
   @HiveField(2)
-  String? category;
+  final String? category;
 
   @HiveField(3)
-  String quantity;        // np. "2 szt.", "300g", "1 l", "1 opak."
+  final String quantity;
 
   @HiveField(4)
-  bool isChecked;
+  final DateTime createdAt;
 
   @HiveField(5)
-  DateTime createdAt;
+  bool isChecked;
+
+  @HiveField(6)
+  DateTime? updatedAt;
 
   ShoppingItem({
     required this.id,
     required this.name,
     this.category,
-    this.quantity = "1 szt.",
-    this.isChecked = false,
+    this.quantity = '1 szt.',
     required this.createdAt,
+    this.isChecked = false,
+    this.updatedAt,
   });
+
+  factory ShoppingItem.fromJson(Map<String, dynamic> json) => ShoppingItem(
+        id: json['id'],
+        name: json['name'],
+        category: json['category'],
+        quantity: json['quantity'] ?? '1 szt.',
+        createdAt: DateTime.parse(json['created_at']),
+        isChecked: json['is_checked'] ?? false,
+        updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+      );
+
+  Map<String, dynamic> toJson(String userId) => {
+        'id': id,
+        'user_id': userId,
+        'name': name,
+        'category': category,
+        'quantity': quantity,
+        'created_at': createdAt.toIso8601String(),
+        'is_checked': isChecked,
+        'updated_at': (updatedAt ?? DateTime.now()).toIso8601String(),
+      };
 }

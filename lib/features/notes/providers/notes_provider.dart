@@ -1,9 +1,15 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import '../models/note_model.dart';
 
 class NotesProvider with ChangeNotifier {
   final Box<Note> _box = Hive.box<Note>('notes');
+
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
   List<Note> get notes {
     final list = _box.values.toList();
@@ -22,34 +28,70 @@ class NotesProvider with ChangeNotifier {
   }
 
   Future<void> addNote(String title, String content, {String? category}) async {
-    final note = Note(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title.trim(),
-      content: content.trim(),
-      createdAt: DateTime.now(),
-      category: category,
-    );
-    await _box.put(note.id, note);
+    _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
+
+    try {
+      if (title.trim().isEmpty) throw Exception('Tytuł nie może być pusty');
+      final note = Note(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: title.trim(),
+        content: content.trim(),
+        createdAt: DateTime.now(),
+        category: category,
+      );
+      await _box.put(note.id, note);
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> updateNote(String id, String title, String content, {String? category}) async {
-  final oldNote = _box.get(id);
-  if (oldNote != null) {
-    final updatedNote = Note(
-      id: oldNote.id,
-      title: title.trim(),
-      content: content.trim(),
-      createdAt: oldNote.createdAt,
-      category: category ?? oldNote.category,
-    );
-    await _box.put(id, updatedNote);
+    _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
+
+    try {
+      final oldNote = _box.get(id);
+      if (oldNote != null && title.trim().isNotEmpty) {
+        final updatedNote = Note(
+          id: oldNote.id,
+          title: title.trim(),
+          content: content.trim(),
+          createdAt: oldNote.createdAt,
+          category: category ?? oldNote.category,
+        );
+        await _box.put(id, updatedNote);
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
-}
 
   Future<void> deleteNote(String id) async {
-    await _box.delete(id);
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _box.delete(id);
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void clearError() {
+    _errorMessage = null;
     notifyListeners();
   }
 }

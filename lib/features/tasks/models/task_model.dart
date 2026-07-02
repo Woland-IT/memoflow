@@ -17,10 +17,10 @@ class Task extends HiveObject {
   final DateTime dateTime;
 
   @HiveField(4)
-  final String type;
+  final String type;           // np. "birthday", "meeting"
 
   @HiveField(5)
-  final String recurrence;
+  final String recurrence;     // "none", "weekly", "monthly", "yearly"
 
   @HiveField(6)
   bool isDone;
@@ -39,26 +39,30 @@ class Task extends HiveObject {
     this.updatedAt,
   });
 
+  // Poprawiony fromJson pod Supabase
   factory Task.fromJson(Map<String, dynamic> json) => Task(
-        id: json['id'],
-        title: json['title'],
-        description: json['description'],
-        dateTime: DateTime.parse(json['date_time']),
-        type: json['type'],
-        recurrence: json['recurrence'] ?? 'none',
-        isDone: json['is_done'] ?? false,
-        updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+        id: json['id']?.toString() ?? '',
+        title: json['title']?.toString() ?? 'Brak tytułu',
+        description: json['description']?.toString(),
+        dateTime: json['due_date'] != null 
+            ? DateTime.tryParse(json['due_date'].toString()) ?? DateTime.now()
+            : DateTime.now(),
+        type: json['type']?.toString() ?? 'other',
+        recurrence: json['recurring']?.toString() ?? json['recurrence']?.toString() ?? 'none',
+        isDone: json['is_completed'] == true || json['is_done'] == true,
+        updatedAt: json['updated_at'] != null 
+            ? DateTime.tryParse(json['updated_at'].toString()) 
+            : null,
       );
 
-  Map<String, dynamic> toJson(String userId) => {
+  Map<String, dynamic> toJson() => {
         'id': id,
-        'user_id': userId,
         'title': title,
         'description': description,
-        'date_time': dateTime.toIso8601String(),
+        'due_date': dateTime.toIso8601String(),
         'type': type,
-        'recurrence': recurrence,
-        'is_done': isDone,
+        'recurring': recurrence,
+        'is_completed': isDone,
         'updated_at': (updatedAt ?? DateTime.now()).toIso8601String(),
       };
 }

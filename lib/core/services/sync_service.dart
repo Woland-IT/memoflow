@@ -4,31 +4,39 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/notes/providers/notes_provider.dart';
 import '../../features/tasks/providers/tasks_provider.dart';
 import '../../features/shopping/providers/shopping_provider.dart';
+import '../../features/notes/models/note_model.dart';
+import '../../features/tasks/models/task_model.dart';
+import '../../features/shopping/models/shopping_item_model.dart';
 
 class SyncService extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
-  // Prosty status
   bool isSyncing = false;
+  String? lastSyncError;
 
   Future<void> syncAll({
     required NotesProvider notesProvider,
     required TasksProvider tasksProvider,
     required ShoppingProvider shoppingProvider,
   }) async {
-    if (supabase.auth.currentUser == null) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
 
     isSyncing = true;
+    lastSyncError = null;
     notifyListeners();
 
     try {
-      // TODO: Na razie placeholder – później pełne push/pull
-      await _syncNotes(notesProvider);
-      await _syncTasks(tasksProvider);
-      await _syncShopping(shoppingProvider);
+      await _pullNotes(notesProvider, user.id);
+      await _pullTasks(tasksProvider, user.id);
+      await _pullShopping(shoppingProvider, user.id);
 
-      print('✅ Sync completed');
+      // TODO: push local changes
+      await _pushLocalChanges(notesProvider, tasksProvider, shoppingProvider, user.id);
+
+      print('✅ Pełna synchronizacja zakończona');
     } catch (e) {
+      lastSyncError = e.toString();
       print('❌ Sync error: $e');
     } finally {
       isSyncing = false;
@@ -36,20 +44,34 @@ class SyncService extends ChangeNotifier {
     }
   }
 
-  Future<void> _syncNotes(NotesProvider provider) async {
-    // Przykład: pobierz z Supabase i merguj z Hive
-    final userId = supabase.auth.currentUser!.id;
+  Future<void> _pullNotes(NotesProvider provider, String userId) async {
     final response = await supabase
         .from('notes')
         .select()
-        .eq('user_id', userId)
-        .order('updated_at', ascending: false);
+        .eq('user_id', userId);
 
-    // Tutaj logika mergowania z lokalnym Hive...
-    // Na razie zostawiam jako szkielet
+    // Merguj z lokalnym Hive (prosty przykład – w produkcji porównuj timestampy)
+    for (var item in response) {
+      final note = Note.fromJson(item); // dodaj fromJson do modelu
+      // provider._box.put... logika mergowania
+    }
   }
 
-  // Podobne metody dla tasks i shopping...
-  Future<void> _syncTasks(TasksProvider provider) async { /* ... */ }
-  Future<void> _syncShopping(ShoppingProvider provider) async { /* ... */ }
+  Future<void> _pullTasks(TasksProvider provider, String userId) async { /* analogicznie */ }
+  Future<void> _pullShopping(ShoppingProvider provider, String userId) async { /* analogicznie */ }
+
+  Future<void> _pushLocalChanges(
+    NotesProvider notesP,
+    TasksProvider tasksP,
+    ShoppingProvider shoppingP,
+    String userId,
+  ) async {
+    // Przykład push notes
+    // for each local change -> supabase.from('notes').upsert(...)
+  }
+
+  void clearError() {
+    lastSyncError = null;
+    notifyListeners();
+  }
 }

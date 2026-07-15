@@ -3,11 +3,15 @@ import 'package:hive/hive.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/shopping_item_model.dart';
+import '../repositories/shopping_product_repository.dart';
+import '../models/shopping_product_model.dart';
 
 class ShoppingProvider with ChangeNotifier {
-  final Box<ShoppingItem> _box = Hive.box<ShoppingItem>('shopping_items');
+  late final Box<ShoppingItem> _box;
   final supabase = Supabase.instance.client;
   final _uuid = const Uuid();
+
+  final ShoppingProductRepository _productRepo = ShoppingProductRepository();
 
   List<ShoppingItem> get activeItems => 
       _box.values.where((item) => !item.isChecked).toList()
@@ -19,6 +23,38 @@ class ShoppingProvider with ChangeNotifier {
 
   final List<String> commonCategories = ['Warzywa', 'Owoce', 'Mięso', 'Nabiał', 'Pieczywo', 'Napoje', 'Słodycze', 'Chemia', 'Inne'];
 
+  ShoppingProvider() {
+    _init();
+  }
+
+  Future<void> _init() async {
+    // Inicjalizacja boxa dla ShoppingItem
+    if (!Hive.isBoxOpen('shopping_items')) {
+      _box = await Hive.openBox<ShoppingItem>('shopping_items');
+    } else {
+      _box = Hive.box<ShoppingItem>('shopping_items');
+    }
+
+    // Inicjalizacja repo produktów (już obsługuje asynchronicznie)
+await _productRepo.init();
+await _productRepo.printBoxInfo(); // do debugu
+
+    print('✅ Hive boxes otwarte - produktów: ${(await _productRepo.getAll()).length}');
+  }
+
+  // ==================== AUTOUZUPEŁNIANIE ====================
+  Future<List<String>> getProductSuggestions(String query) async {
+    final products = await _productRepo.search(query);
+    return products.map((p) => p.name).toList();
+  }
+
+  Future<List<ShoppingProduct>> getFrequentProducts() async {
+    final list = await _productRepo.getAll();
+    print('📋 getFrequentProducts() zwróciło ${list.length} produktów');
+    return list;
+  }
+
+  // ==================== CRUD ====================
   Future<void> addItem(String name, {String? category, String quantity = "1 szt."}) async {
     final item = ShoppingItem(
       id: _uuid.v4(),
@@ -29,15 +65,23 @@ class ShoppingProvider with ChangeNotifier {
       createdAt: DateTime.now(),
     );
 
+    print('📝 Dodaję produkt: ${item.name}');
+
     await _box.put(item.id, item);
     notifyListeners();
     await _syncToSupabase(item);
+
+    // Zapisz do bazy często kupowanych
+    await _productRepo.addOrUpdate(name, category: category);
   }
 
   Future<void> toggleCheck(String id) async {
     final item = _box.get(id);
     if (item == null) return;
     item.isChecked = !item.isChecked;
+    if (item.isChecked) {
+      await _productRepo.addOrUpdate(item.name, category: item.category);
+    }
     await item.save();
     notifyListeners();
     await _syncToSupabase(item);
@@ -54,11 +98,10 @@ class ShoppingProvider with ChangeNotifier {
   }
 
   Future<void> deleteItem(String id) async {
-    final item = _box.get(id);
     await _box.delete(id);
     notifyListeners();
     try {
-      // Używaj supabaseId jeśli dostępny, inaczej użyj id
+      final item = _box.get(id);
       final remoteId = item?.supabaseId ?? id;
       await supabase.from('shopping_items').delete().eq('id', remoteId);
     } catch (e) {}
@@ -69,7 +112,6 @@ class ShoppingProvider with ChangeNotifier {
     if (user == null) return;
 
     try {
-      // Tworzymy lub pobieramy domyślną listę zakupów
       var listResponse = await supabase
           .from('shopping_lists')
           .select('id')
@@ -89,7 +131,7 @@ class ShoppingProvider with ChangeNotifier {
       }
 
       await supabase.from('shopping_items').upsert({
-        'id': item.supabaseId ?? item.id,  // Używaj supabaseId jeśli dostępny
+        'id': item.supabaseId ?? item.id,
         'list_id': listId,
         'name': item.name,
         'quantity': item.quantity,
@@ -115,7 +157,7 @@ class ShoppingProvider with ChangeNotifier {
           .eq('list_id', (await supabase.from('shopping_lists').select('id').eq('user_id', user.id).limit(1)).first['id']);
 
       for (var json in response) {
-        final item = ShoppingItem.fromJson(json);
+         final item = ShoppingItem.fromJson(json);
         await _box.put(item.id, item);
       }
       notifyListeners();
@@ -124,4 +166,9 @@ class ShoppingProvider with ChangeNotifier {
       print('Błąd pobierania zakupów: $e');
     }
   }
+
+    // Wszystkie produkty (aktywne + zarchiwizowane) – do wyszukiwarki
+  List<ShoppingItem> get allItems => 
+      _box.values.toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 }

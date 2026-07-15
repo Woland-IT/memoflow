@@ -24,7 +24,10 @@ class Note extends HiveObject {
   DateTime? updatedAt;
 
   @HiveField(6)
-  String? supabaseId;           // czysty UUID z Supabase
+  String? supabaseId;
+
+  @HiveField(7)                    // ← NOWE POLE
+  bool isArchived;
 
   Note({
     String? id,
@@ -34,28 +37,51 @@ class Note extends HiveObject {
     this.category,
     this.updatedAt,
     this.supabaseId,
+    this.isArchived = false,       // ← domyślnie false
   })  : id = id ?? const Uuid().v4() + '_' + DateTime.now().millisecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now();
+
+  // copyWith – bardzo przydatne przy archiwizacji
+  Note copyWith({
+    String? title,
+    String? content,
+    String? category,
+    DateTime? updatedAt,
+    bool? isArchived,
+  }) {
+    return Note(
+      id: id,
+      title: title ?? this.title,
+      content: content ?? this.content,
+      createdAt: createdAt,
+      category: category ?? this.category,
+      updatedAt: updatedAt ?? this.updatedAt,
+      supabaseId: supabaseId,
+      isArchived: isArchived ?? this.isArchived,
+    );
+  }
 
   factory Note.fromJson(Map<String, dynamic> json) {
     return Note(
       id: json['id'] ?? const Uuid().v4() + '_' + DateTime.now().millisecondsSinceEpoch.toString(),
-      supabaseId: json['id']?.toString(), // czysty UUID
+      supabaseId: json['id']?.toString(),
       title: json['title'] ?? '',
       content: json['content'] ?? '',
       createdAt: DateTime.parse(json['created_at']),
       category: json['category'],
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+      isArchived: json['is_archived'] ?? false,     // ← dodane
     );
   }
 
   Map<String, dynamic> toJson(String userId) {
     return {
-      'id': supabaseId ?? id.split('_').first, // używaj supabaseId jeśli istnieje
+      'id': supabaseId ?? id.split('_').first,
       'user_id': userId,
       'title': title,
       'content': content,
       'category': category,
+      'is_archived': isArchived,                    // ← dodane
       'created_at': createdAt.toIso8601String(),
       'updated_at': (updatedAt ?? DateTime.now()).toIso8601String(),
     };

@@ -10,6 +10,7 @@ import 'app.dart';
 import 'features/notes/models/note_model.dart';
 import 'features/tasks/models/task_model.dart';
 import 'features/shopping/models/shopping_item_model.dart';
+import 'features/shopping/models/shopping_product_model.dart';
 
 import 'features/notes/providers/notes_provider.dart';
 import 'features/tasks/providers/tasks_provider.dart';
@@ -34,7 +35,7 @@ Future<void> main() async {
   );
 
   print('Supabase URL: ${dotenv.env['SUPABASE_URL']}');
-print('Anon Key length: ${dotenv.env['SUPABASE_ANON_KEY']?.length}');
+  print('Anon Key length: ${dotenv.env['SUPABASE_ANON_KEY']?.length}');
 
   // ====================== HIVE ======================
   await Hive.initFlutter();
@@ -42,10 +43,14 @@ print('Anon Key length: ${dotenv.env['SUPABASE_ANON_KEY']?.length}');
   Hive.registerAdapter(NoteAdapter());
   Hive.registerAdapter(TaskAdapter());
   Hive.registerAdapter(ShoppingItemAdapter());
+  Hive.registerAdapter(ShoppingProductAdapter());
 
   await Hive.openBox<Note>('notes');
   await Hive.openBox<Task>('tasks');
   await Hive.openBox<ShoppingItem>('shopping_items');
+  await Hive.openBox<ShoppingProduct>('shopping_products');
+
+  print('✅ Wszystkie Hive boxy otwarte - shopping_products: ${Hive.box<ShoppingProduct>('shopping_products').length}');
 
   // ====================== URUCHOMIENIE APLIKACJI ======================
   runApp(
@@ -62,4 +67,3 @@ print('Anon Key length: ${dotenv.env['SUPABASE_ANON_KEY']?.length}');
   );
 }
 
-final supabase = Supabase.instance.client;

@@ -6,7 +6,6 @@ import '../models/task_model.dart';
 import '../models/task_type.dart';
 import '../providers/tasks_provider.dart';
 
-
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
 
@@ -63,55 +62,148 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     );
   }
 
-  // ==================== Zakładki ====================
+  // ==================== ZAKŁADKI ====================
+
+    // ==================== NADCHODZĄCE ====================
+  int _upcomingFilterDays = 30; // domyślnie 30 dni
 
   Widget _buildUpcomingTab(TasksProvider provider) {
-    final tasks = provider.upcomingTasks;
-    return tasks.isEmpty
-        ? const Center(child: Text('Brak nadchodzących wydarzeń w tym dniu'))
-        : ListView.builder(
-            itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              final task = tasks[index];
-              return _buildTaskCard(task, provider);
-            },
-          );
+    final now = DateTime.now();
+    final cutoffDate = now.add(Duration(days: _upcomingFilterDays));
+
+    final filteredTasks = provider.upcomingTasks.where((task) {
+      final date = task.nextOccurrence ?? task.dateTime;
+      return date.isBefore(cutoffDate);
+    }).toList();
+
+    return Column(
+      children: [
+        // Filtr zakresu
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [7, 14, 30, 90, 180, 365].map((days) {
+                final isSelected = _upcomingFilterDays == days;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(days == 365 ? 'Cały rok' : '$days dni'),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() => _upcomingFilterDays = days);
+                    },
+                    backgroundColor: Colors.grey[200],
+                    selectedColor: Colors.blue[100],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+
+        // Lista wydarzeń
+        Expanded(
+          child: filteredTasks.isEmpty
+              ? const Center(child: Text('Brak nadchodzących wydarzeń w wybranym okresie'))
+              : ListView.builder(
+                  itemCount: filteredTasks.length,
+                  itemBuilder: (context, index) {
+                    final task = filteredTasks[index];
+                    return _buildTaskCard(task, provider);
+                  },
+                ),
+        ),
+      ],
+    );
   }
 
-    Widget _buildAnniversariesTab(TasksProvider provider) {
+   // ==================== ROCZNICE Z FILTREM ====================
+    // ==================== ROCZNICE ====================
+  int _anniversaryFilterDays = 365; // domyślnie 1 rok
+
+  Widget _buildAnniversariesTab(TasksProvider provider) {
+    final now = DateTime.now();
+    final cutoffDate = now.add(Duration(days: _anniversaryFilterDays));
+
     final anniversaries = provider.tasks.where((t) => 
       t.type == 'birthday' || t.type == 'nameDay' || t.type == 'deathAnniversary'
     ).toList();
 
-    return anniversaries.isEmpty
-        ? const Center(child: Text('Brak rocznic'))
-        : ListView.builder(
-            itemCount: anniversaries.length,
-            itemBuilder: (context, index) {
-              final task = anniversaries[index];
-              return _buildTaskCard(task, provider);
-            },
-          );
-  }
+    final filtered = anniversaries.where((task) {
+      final nextDate = provider.getNextOccurrence(task);
+      return nextDate.isBefore(cutoffDate);
+    }).toList();
 
-     Widget _buildArchivedTab(TasksProvider provider) {
-    final archived = provider.tasks.where((t) => t.isDone).toList(); // tymczasowo używamy isDone jako archiwum
-    return archived.isEmpty
-        ? const Center(child: Text('Brak zarchiwizowanych wydarzeń'))
-        : ListView.builder(
-            itemCount: archived.length,
-            itemBuilder: (context, index) {
-              final task = archived[index];
-              return _buildTaskCard(task, provider, isArchived: true);
-            },
-          );
-  }
-
-   Widget _buildCalendarTab(TasksProvider provider) {
     return Column(
       children: [
-        // Kalendarz
-                TableCalendar(
+        // Filtr
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                30, 90, 180, 365, 730
+              ].map((days) {
+                final label = days == 30 ? '30 dni' :
+                             days == 90 ? '90 dni' :
+                             days == 180 ? '180 dni' :
+                             days == 365 ? '1 rok' : '2 lata';
+                final isSelected = _anniversaryFilterDays == days;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(label),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() => _anniversaryFilterDays = days);
+                    },
+                    backgroundColor: Colors.grey[200],
+                    selectedColor: Colors.pink[100],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+
+        Expanded(
+          child: filtered.isEmpty
+              ? Center(child: Text('Brak rocznic w wybranym okresie'))
+              : ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final task = filtered[index];
+                    return _buildTaskCard(task, provider, showNextDate: true);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildArchivedTab(TasksProvider provider) {
+    final archived = provider.tasks.where((t) => t.isDone).toList();
+
+    if (archived.isEmpty) {
+      return const Center(child: Text('Brak zarchiwizowanych wydarzeń'));
+    }
+
+    return ListView.builder(
+      itemCount: archived.length,
+      itemBuilder: (context, index) {
+        final task = archived[index];
+        return _buildTaskCard(task, provider, isArchived: true);
+      },
+    );
+  }
+
+  Widget _buildCalendarTab(TasksProvider provider) {
+    return Column(
+      children: [
+        TableCalendar(
           firstDay: DateTime.utc(2020, 1, 1),
           lastDay: DateTime.utc(2035, 12, 31),
           focusedDay: _selectedDate,
@@ -132,10 +224,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                       color: Colors.blue,
                       shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      '${events.length}',
-                      style: const TextStyle(color: Colors.white, fontSize: 10),
-                    ),
+                    child: Text('${events.length}', style: const TextStyle(color: Colors.white, fontSize: 10)),
                   ),
                 );
               }
@@ -144,51 +233,32 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
           ),
           calendarStyle: const CalendarStyle(
             markersAlignment: Alignment.bottomRight,
-            todayDecoration: BoxDecoration(
-              color: Colors.blueAccent,
-              shape: BoxShape.circle,
-            ),
-            selectedDecoration: BoxDecoration(
-              color: Colors.blue,
-              shape: BoxShape.circle,
-            ),
+            todayDecoration: BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
+            selectedDecoration: BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
           ),
-          headerStyle: const HeaderStyle(
-            formatButtonVisible: false,
-            titleCentered: true,
-            titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
+          headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true),
         ),
-
         const Divider(),
-
-        // Wydarzenia wybranego dnia
-        Expanded(
-          child: _buildDayEvents(provider),
-        ),
+        Expanded(child: _buildDayEvents(provider)),
       ],
     );
   }
 
-
-
   Widget _buildDayEvents(TasksProvider provider) {
     final dayTasks = provider.getTasksForDay(_selectedDate);
-    return dayTasks.isEmpty
-        ? const Center(child: Text('Brak wydarzeń w tym dniu'))
-        : ListView.builder(
-            itemCount: dayTasks.length,
-            itemBuilder: (context, index) {
-              final task = dayTasks[index];
-              return _buildTaskCard(task, provider);
-            },
-          );
+    if (dayTasks.isEmpty) {
+      return const Center(child: Text('Brak wydarzeń w tym dniu'));
+    }
+    return ListView.builder(
+      itemCount: dayTasks.length,
+      itemBuilder: (context, index) => _buildTaskCard(dayTasks[index], provider),
+    );
   }
 
-  // ==================== Karta zadania ====================
-
-    Widget _buildTaskCard(Task task, TasksProvider provider, {bool isArchived = false}) {
-    final isOverdue = task.dateTime.isBefore(DateTime.now()) && !task.isDone;
+  // ==================== KARTA ZADANIA ====================
+    Widget _buildTaskCard(Task task, TasksProvider provider, {bool isArchived = false, bool showNextDate = false}) {
+    final displayDate = task.nextOccurrence ?? task.dateTime;
+    final isOverdue = displayDate.isBefore(DateTime.now()) && !task.isDone;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -198,10 +268,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           backgroundColor: _getTypeColor(task.type).withOpacity(0.2),
-          child: Icon(
-            _getIconForType(task.type),
-            color: _getTypeColor(task.type),
-          ),
+          child: Icon(_getIconForType(task.type), color: _getTypeColor(task.type)),
         ),
         title: Text(
           task.title,
@@ -214,31 +281,32 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              DateFormat('dd.MM.yyyy • HH:mm').format(task.dateTime),
-              style: TextStyle(
-                color: isOverdue ? Colors.red : Colors.grey[600],
-                fontSize: 13,
-              ),
+              DateFormat('dd.MM.yyyy • HH:mm').format(displayDate),
+              style: TextStyle(color: isOverdue ? Colors.red : Colors.grey[600], fontSize: 13),
             ),
+            if (task.recurrence != "none")
+              Text('Powtarzanie: ${task.recurrence}', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
             if (task.description != null && task.description!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  task.description!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13),
-                ),
+                child: Text(task.description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
               ),
           ],
         ),
-        // === NOWY TRAILING Z PRZYCISKAMI ===
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.edit, size: 20),
+              icon: const Icon(Icons.edit, size: 20, color: Colors.blue),
               onPressed: () => _showEditTaskDialog(context, provider, task),
+            ),
+            IconButton(
+              icon: Icon(
+                task.isDone ? Icons.unarchive : Icons.archive_outlined,
+                size: 20,
+                color: task.isDone ? Colors.green : Colors.orange,
+              ),
+              onPressed: () => provider.toggleDone(task.id),
             ),
             IconButton(
               icon: const Icon(Icons.delete, size: 20, color: Colors.red),
@@ -246,36 +314,10 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
             ),
           ],
         ),
-        onTap: () => _showEditTaskDialog(context, provider, task),
       ),
     );
   }
-
-    IconData _getIconForType(String typeStr) {
-    try {
-      final type = TaskType.values.byName(typeStr);
-      return type.icon;
-    } catch (e) {
-      return Icons.event_note; // fallback
-    }
-  }
-
-  Color _getTypeColor(String typeStr) {
-    switch (typeStr) {
-      case 'birthday':
-      case 'nameDay':
-        return Colors.pink;
-      case 'meeting':
-        return Colors.blue;
-      case 'call':
-        return Colors.green;
-      case 'deathAnniversary':
-        return Colors.grey;
-      default:
-        return Colors.orange;
-    }
-  }
-
+    
     // ==================== Dialog dodawania zadania ====================
 
     void _showAddTaskDialog(BuildContext context, TasksProvider provider) {
@@ -393,13 +435,12 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     );
   }
     // ==================== Dialog edycji zadania ====================
-
-    void _showEditTaskDialog(BuildContext context, TasksProvider provider, Task task) {
+  void _showEditTaskDialog(BuildContext context, TasksProvider provider, Task task) {
     final titleController = TextEditingController(text: task.title);
     final descController = TextEditingController(text: task.description);
     DateTime selectedDate = task.dateTime;
     TimeOfDay selectedTime = TimeOfDay.fromDateTime(task.dateTime);
-    TaskType selectedType = TaskType.values.byName(task.type); // dopasowane do String
+    TaskType selectedType = TaskType.values.byName(task.type);
     String recurrence = task.recurrence;
 
     showDialog(
@@ -488,15 +529,15 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                 selectedTime.minute,
               );
 
-              // Na razie aktualizujemy przez delete + add (proste rozwiązanie)
-              provider.deleteTask(task.id);
-              provider.addTask(
-                titleController.text,
-                dateTime,
-                selectedType,
+              final updatedTask = task.copyWith(
+                title: titleController.text.trim(),
                 description: descController.text.isEmpty ? null : descController.text,
+                dateTime: dateTime,
+                type: selectedType.name,
                 recurrence: recurrence,
               );
+
+              provider.updateTask(updatedTask);
 
               Navigator.pop(context);
             },
@@ -506,6 +547,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
       ),
     );
   }
+   
     // ==================== Potwierdzenie archiwizacji/usunięcia ====================
 
     void _confirmArchiveOrDelete(BuildContext context, TasksProvider provider, Task task) {
@@ -537,6 +579,29 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     super.didChangeDependencies();
     // ewentualne dodatkowe inicjalizacje
   }
+  IconData _getIconForType(String typeStr) {
+    try {
+      final type = TaskType.values.byName(typeStr);
+      return type.icon;
+    } catch (e) {
+      return Icons.event_note; // fallback
+    }
+  }
 
+  Color _getTypeColor(String typeStr) {
+    switch (typeStr) {
+      case 'birthday':
+      case 'nameDay':
+        return Colors.pink;
+      case 'meeting':
+        return Colors.blue;
+      case 'call':
+        return Colors.green;
+      case 'deathAnniversary':
+        return Colors.grey;
+      default:
+        return Colors.orange;
+    }
+  }
 
 }

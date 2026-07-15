@@ -32,6 +32,7 @@ class NotesProvider with ChangeNotifier {
       content: content.trim(),
       createdAt: DateTime.now(),
       category: category,
+      isArchived: false,               // ← domyślnie niearchiwizowana
     );
 
     await _box.put(note.id, note);
@@ -44,12 +45,25 @@ class NotesProvider with ChangeNotifier {
     final oldNote = _box.get(id);
     if (oldNote == null) return;
 
-    final updatedNote = Note(
-      id: oldNote.id,
+    final updatedNote = oldNote.copyWith(          // ← lepiej używać copyWith
       title: title.trim(),
       content: content.trim(),
-      createdAt: oldNote.createdAt,
       category: category ?? oldNote.category,
+      updatedAt: DateTime.now(),
+    );
+
+    await _box.put(id, updatedNote);
+    notifyListeners();
+    await _syncToSupabase(updatedNote);
+  }
+
+  // ==================== ARCHIWIZACJA ====================
+  Future<void> toggleArchive(String id) async {
+    final note = _box.get(id);
+    if (note == null) return;
+
+    final updatedNote = note.copyWith(
+      isArchived: !note.isArchived,
       updatedAt: DateTime.now(),
     );
 
@@ -65,7 +79,6 @@ class NotesProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Używaj supabaseId jeśli dostępny, inaczej użyj id
       final remoteId = note?.supabaseId ?? id;
       await supabase.from('notes').delete().eq('id', remoteId);
     } catch (e) {
@@ -83,11 +96,12 @@ class NotesProvider with ChangeNotifier {
 
     try {
       await supabase.from('notes').upsert({
-        'id': note.supabaseId ?? note.id,  // Używaj supabaseId jeśli dostępny
+        'id': note.supabaseId ?? note.id,
         'user_id': user.id,
         'title': note.title,
         'content': note.content,
         'category': note.category,
+        'is_archived': note.isArchived,           // ← dodane
         'created_at': note.createdAt.toIso8601String(),
         'updated_at': (note.updatedAt ?? DateTime.now()).toIso8601String(),
       }, onConflict: 'id');

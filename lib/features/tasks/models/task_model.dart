@@ -15,13 +15,13 @@ class Task extends HiveObject {
   final String? description;
 
   @HiveField(3)
-  final DateTime dateTime;
+  final DateTime dateTime;           // data startowa / bazowa
 
   @HiveField(4)
-  final String type;           // np. "birthday", "meeting"
+  final String type;                 // "birthday", "meeting", "reminder" itp.
 
   @HiveField(5)
-  final String recurrence;     // "none", "weekly", "monthly", "yearly"
+  final String recurrence;           // "none", "weekly", "monthly", "yearly"
 
   @HiveField(6)
   bool isDone;
@@ -30,7 +30,10 @@ class Task extends HiveObject {
   DateTime? updatedAt;
 
   @HiveField(8)
-  String? supabaseId;           // czysty UUID z Supabase
+  String? supabaseId;
+
+  @HiveField(9)                      // ← NOWE POLE
+  DateTime? nextOccurrence;          // obliczona data następnego wystąpienia
 
   Task({
     String? id,
@@ -42,29 +45,56 @@ class Task extends HiveObject {
     this.isDone = false,
     this.updatedAt,
     this.supabaseId,
+    this.nextOccurrence,
   }) : id = id ?? const Uuid().v4() + '_' + DateTime.now().millisecondsSinceEpoch.toString();
 
-  factory Task.fromJson(Map<String, dynamic> json) {
+  // copyWith
+  Task copyWith({
+    String? title,
+    String? description,
+    DateTime? dateTime,
+    String? type,
+    String? recurrence,
+    bool? isDone,
+    DateTime? updatedAt,
+    DateTime? nextOccurrence,
+  }) {
     return Task(
-      supabaseId: json['id']?.toString(), // czysty UUID z Supabase
+      id: id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      dateTime: dateTime ?? this.dateTime,
+      type: type ?? this.type,
+      recurrence: recurrence ?? this.recurrence,
+      isDone: isDone ?? this.isDone,
+      updatedAt: updatedAt ?? this.updatedAt,
+      supabaseId: supabaseId,
+      nextOccurrence: nextOccurrence ?? this.nextOccurrence,
+    );
+  }
+
+   factory Task.fromJson(Map<String, dynamic> json) {
+    return Task(
+      supabaseId: json['id']?.toString(),
       id: json['id']?.toString() ?? const Uuid().v4() + '_' + DateTime.now().millisecondsSinceEpoch.toString(),
       title: json['title']?.toString() ?? 'Brak tytułu',
       description: json['description']?.toString(),
       dateTime: json['due_date'] != null 
           ? DateTime.tryParse(json['due_date'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      type: json['type']?.toString() ?? 'other',
+      type: json['type']?.toString() ?? 'other',   // ← poprawione
       recurrence: json['recurring']?.toString() ?? json['recurrence']?.toString() ?? 'none',
       isDone: json['is_completed'] == true || json['is_done'] == true,
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.tryParse(json['updated_at'].toString()) 
+      updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
+      nextOccurrence: json['next_occurrence'] != null 
+          ? DateTime.tryParse(json['next_occurrence'].toString()) 
           : null,
     );
   }
 
   Map<String, dynamic> toJson(String userId) {
     return {
-      'id': supabaseId ?? id.split('_').first, // używaj supabaseId jeśli istnieje
+      'id': supabaseId ?? id.split('_').first,
       'user_id': userId,
       'title': title,
       'description': description,
@@ -72,6 +102,7 @@ class Task extends HiveObject {
       'type': type,
       'recurring': recurrence,
       'is_completed': isDone,
+      'next_occurrence': nextOccurrence?.toIso8601String(),
       'updated_at': (updatedAt ?? DateTime.now()).toIso8601String(),
     };
   }

@@ -53,4 +53,6 @@ class AuthService extends ChangeNotifier {
     await supabase.auth.refreshSession();
     notifyListeners();
   }
+
+  bool get isLoggedIn => currentUser != null;
 }

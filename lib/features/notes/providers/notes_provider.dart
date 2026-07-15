@@ -60,11 +60,14 @@ class NotesProvider with ChangeNotifier {
 
   // ==================== USUWANIE ====================
   Future<void> deleteNote(String id) async {
+    final note = _box.get(id);
     await _box.delete(id);
     notifyListeners();
 
     try {
-      await supabase.from('notes').delete().eq('id', id);
+      // Używaj supabaseId jeśli dostępny, inaczej użyj id
+      final remoteId = note?.supabaseId ?? id;
+      await supabase.from('notes').delete().eq('id', remoteId);
     } catch (e) {
       print('Błąd usuwania z Supabase: $e');
     }
@@ -80,7 +83,7 @@ class NotesProvider with ChangeNotifier {
 
     try {
       await supabase.from('notes').upsert({
-        'id': note.id,
+        'id': note.supabaseId ?? note.id,  // Używaj supabaseId jeśli dostępny
         'user_id': user.id,
         'title': note.title,
         'content': note.content,

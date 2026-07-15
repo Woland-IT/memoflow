@@ -33,6 +33,9 @@ Future<void> main() async {
     debug: true,
   );
 
+  print('Supabase URL: ${dotenv.env['SUPABASE_URL']}');
+print('Anon Key length: ${dotenv.env['SUPABASE_ANON_KEY']?.length}');
+
   // ====================== HIVE ======================
   await Hive.initFlutter();
 

@@ -70,6 +70,7 @@ class TasksProvider with ChangeNotifier {
       instances.add(
         Task(
           id: '${task.id}_${current.millisecondsSinceEpoch}',
+          supabaseId: task.supabaseId,  // ← ważne! zachowaj supabaseId
           title: task.title,
           description: task.description,
           dateTime: current,
@@ -125,11 +126,14 @@ class TasksProvider with ChangeNotifier {
   }
 
   Future<void> deleteTask(String id) async {
+    final task = _box.get(id);
     await _box.delete(id);
     notifyListeners();
 
     try {
-      await supabase.from('tasks').delete().eq('id', id);
+      // Używaj supabaseId jeśli dostępny, inaczej użyj id
+      final remoteId = task?.supabaseId ?? id;
+      await supabase.from('tasks').delete().eq('id', remoteId);
     } catch (e) {
       print('Błąd usuwania z Supabase: $e');
     }
@@ -141,7 +145,7 @@ class TasksProvider with ChangeNotifier {
 
     try {
       await supabase.from('tasks').upsert({
-        'id': task.id,
+        'id': task.supabaseId ?? task.id,  // Używaj supabaseId jeśli dostępny
         'user_id': user.id,
         'title': task.title,
         'description': task.description,

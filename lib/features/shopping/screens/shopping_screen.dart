@@ -45,17 +45,26 @@ class ShoppingScreen extends StatelessWidget {
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
-        return Card(
+                return Card(
           margin: const EdgeInsets.all(8),
           child: ListTile(
             leading: const Icon(Icons.shopping_cart_outlined, color: Colors.teal),
             title: Text(item.name),
             subtitle: Text('${item.quantity} ${item.category ?? ""}'),
-            trailing: Checkbox(
-              value: item.isChecked,
-              onChanged: (_) => provider.toggleCheck(item.id),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () => _showEditItemDialog(context, provider, item),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                  onPressed: () => _confirmDelete(context, provider, item.id),
+                ),
+              ],
             ),
-            onLongPress: () => _confirmDelete(context, provider, item.id),
+            onLongPress: () => _confirmDelete(context, provider, item.id), // zostaw na razie
           ),
         );
       },
@@ -140,4 +149,46 @@ class ShoppingScreen extends StatelessWidget {
       ),
     );
   }
+  void _showEditItemDialog(BuildContext context, ShoppingProvider provider, ShoppingItem item) {
+    final nameController = TextEditingController(text: item.name);
+    final quantityController = TextEditingController(text: item.quantity ?? "1 szt.");
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edytuj produkt'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Nazwa produktu'),
+            ),
+            TextField(
+              controller: quantityController,
+              decoration: const InputDecoration(labelText: 'Ilość'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Anuluj'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              provider.deleteItem(item.id); // tymczasowo usuwamy stare
+              provider.addItem(
+                nameController.text.trim(),
+                quantity: quantityController.text.trim(),
+              );
+              Navigator.pop(context);
+            },
+            child: const Text('Zapisz'),
+          ),
+        ],
+      ),
+    );
+  }
+    
 }

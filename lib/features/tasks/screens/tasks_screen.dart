@@ -232,15 +232,21 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
               ),
           ],
         ),
-        trailing: isArchived
-            ? const Icon(Icons.archive, color: Colors.grey)
-            : Checkbox(
-                value: task.isDone,
-                onChanged: (_) => provider.toggleDone(task.id),
-                activeColor: Colors.green,
-              ),
+        // === NOWY TRAILING Z PRZYCISKAMI ===
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, size: 20),
+              onPressed: () => _showEditTaskDialog(context, provider, task),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+              onPressed: () => _confirmArchiveOrDelete(context, provider, task),
+            ),
+          ],
+        ),
         onTap: () => _showEditTaskDialog(context, provider, task),
-        onLongPress: () => _confirmArchiveOrDelete(context, provider, task),
       ),
     );
   }

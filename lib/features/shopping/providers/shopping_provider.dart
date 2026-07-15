@@ -54,10 +54,13 @@ class ShoppingProvider with ChangeNotifier {
   }
 
   Future<void> deleteItem(String id) async {
+    final item = _box.get(id);
     await _box.delete(id);
     notifyListeners();
     try {
-      await supabase.from('shopping_items').delete().eq('id', id);
+      // Używaj supabaseId jeśli dostępny, inaczej użyj id
+      final remoteId = item?.supabaseId ?? id;
+      await supabase.from('shopping_items').delete().eq('id', remoteId);
     } catch (e) {}
   }
 
@@ -86,7 +89,7 @@ class ShoppingProvider with ChangeNotifier {
       }
 
       await supabase.from('shopping_items').upsert({
-        'id': item.id,
+        'id': item.supabaseId ?? item.id,  // Używaj supabaseId jeśli dostępny
         'list_id': listId,
         'name': item.name,
         'quantity': item.quantity,

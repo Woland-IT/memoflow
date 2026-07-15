@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'core/theme.dart';
+import 'package:provider/provider.dart';
 
-// Ekrany
+import 'core/theme.dart';
+import 'core/services/auth_service.dart';
+
 import 'features/auth/screens/login_screen.dart';
 import 'features/notes/screens/notes_screen.dart';
 import 'features/tasks/screens/tasks_screen.dart';
@@ -19,32 +21,49 @@ class MemoFlowApp extends StatefulWidget {
 class _MemoFlowAppState extends State<MemoFlowApp> {
   int _currentIndex = 0;
   bool _isDarkMode = false;
+  bool _isInitialized = false;
 
-  final List<Widget> _screens = [
-    const NotesScreen(),
-    const TasksScreen(),
-    const ShoppingScreen(),
+  final List<Widget> _screens = const [
+    NotesScreen(),
+    TasksScreen(),
+    ShoppingScreen(),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _checkAuthStatus();
+  }
+
+  Future<void> _checkAuthStatus() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    auth.authStateChanges.listen((event) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+    setState(() => _isInitialized = true);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthService>(context);
+    final isLoggedIn = auth.isLoggedIn;   // <-- musi być dodane w AuthService
+
     return MaterialApp(
       title: 'MemoFlow',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
       debugShowCheckedModeBanner: false,
-
-      initialRoute: '/login',
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/home': (context) => _buildMainScaffold(context),
-      },
-      builder: (context, child) => child ?? const SizedBox(),
+      
+      home: !_isInitialized
+          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          : (isLoggedIn ? _buildMainScaffold() : const LoginScreen()),
     );
   }
 
-  Widget _buildMainScaffold(BuildContext context) {
+  Widget _buildMainScaffold() {
     return Scaffold(
       appBar: AppBar(
         title: const Text('MemoFlow'),
@@ -52,6 +71,13 @@ class _MemoFlowAppState extends State<MemoFlowApp> {
           IconButton(
             icon: Icon(_isDarkMode ? Icons.light_mode : Icons.dark_mode),
             onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              final auth = Provider.of<AuthService>(context, listen: false);
+              await auth.signOut();
+            },
           ),
         ],
       ),
